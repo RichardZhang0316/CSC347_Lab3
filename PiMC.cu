@@ -33,14 +33,13 @@ __global__ void computePi_MC_HAS(int n, curandState_t *state, int *count)
     cache[threadIdx.x] = 0;
     __syncthreads();
 
-    if (true) {
-        // Generate random points 
-        double xCoordinate = curand_uniform(&state[index]);
-        double yCoordinate = curand_uniform(&state[index]);
-        if (xCoordinate*xCoordinate + yCoordinate*yCoordinate <= 1.0) {
-            cache[threadIdx.x]++;
-        }
+    // Generate random points 
+    double xCoordinate = curand_uniform(&state[index]);
+    double yCoordinate = curand_uniform(&state[index]);
+    if (xCoordinate*xCoordinate + yCoordinate*yCoordinate <= 1.0) {
+       cache[threadIdx.x]++;
     }
+	
     __syncthreads();
 
     // reduction
