@@ -19,21 +19,21 @@
 #define BLOCK_SIZE 1024
 
 // kernel to initialize the random states
-__global__ void setup_kernel(curandState *state)
+__global__ void setup_kernel(curandState_t *state)
 {
-	int index = threadIdx.x + blockDim.x*blockIdx.x;
+	int index = threadIdx.x + blockDim.x * blockIdx.x;
     curand_init(123456789, index, 0, &state[index]);
 }
 
 // This function calculates the percentage of the points that falled inside the unit circle which is inscribed within the square
-__global__ void computePi_MC_HAS(int n, curandState *state, int *count)
+__global__ void computePi_MC_HAS(int n, curandState_t *state, int *count)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     __shared__ int cache[BLOCK_SIZE];
     cache[threadIdx.x] = 0;
     __syncthreads();
 
-    for (int i = 0; i < n; i++) {
+    if (true) {
         // Generate random points 
         double xCoordinate = curand_uniform(&state[index]);
         double yCoordinate = curand_uniform(&state[index]);
@@ -41,16 +41,18 @@ __global__ void computePi_MC_HAS(int n, curandState *state, int *count)
             cache[threadIdx.x]++;
         }
     }
+    __syncthreads();
 
     // reduction
 	int i = blockDim.x/2;
-	while(i != 0){
+	while(i > 0){
 		if(threadIdx.x < i){
 			cache[threadIdx.x] += cache[threadIdx.x + i];
 		}
 		i /= 2;
 		__syncthreads();
 	}
+
 	// update to our global variable count
 	if(threadIdx.x == 0){
 		atomicAdd(count, cache[0]);
@@ -80,13 +82,13 @@ int main(int argc, char *argv[]) {
     int blockSize = BLOCK_SIZE;
 
     // To generate random numbers on the device
-    curandState *devStates;
-    cudaMalloc((void**)&devStates, gridSize * blockSize * sizeof(curandState));
+    curandState_t *devStates;
+    cudaMalloc((void**)&devStates, iterations * sizeof(curandState));
 
     int *count;
     int *devCount;
-    count = (int*)malloc(gridSize * blockSize * sizeof(int));
-    cudaMalloc((void**)&devCount, gridSize * blockSize * sizeof(int));
+    count = (int*)malloc(iterations * sizeof(int));
+    cudaMalloc((void**)&devCount, iterations * sizeof(int));
     cudaMemset(devCount, 0, sizeof(int));
 
     // initialize all of the random states on the GPU.
@@ -102,14 +104,14 @@ int main(int argc, char *argv[]) {
     cudaEventRecord(stop); /* End the timer */
 
     cudaDeviceSynchronize();
-    cudaMemcpy(count, devCount, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(count, devCount, iterations * sizeof(int), cudaMemcpyDeviceToHost);
 
     /* Output the π result and the execution time of the kernel function to the terminal */
     float total_time = 0.0;
     cudaEventElapsedTime(&total_time, start, stop);
 
-    double pi = 4.0 * (*count) / (iterations * gridSize * blockSize);
-    printf("Pi: %f\n", pi);
+    double pi = (double)4.0 * (*count) / (double)iterations;
+    printf("Pi: %f %d %d\n", pi, *count, iterations);
     printf("Time costed: %f seconds\n", total_time);
 
     cudaFree(devStates);
